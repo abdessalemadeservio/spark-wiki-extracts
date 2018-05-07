@@ -1,10 +1,12 @@
 package com.test.spark.wiki.extracts
 
+import java.io.{File, FileInputStream}
 import java.net.URL
 
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory
+import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import org.apache.spark.sql.{SaveMode, SparkSession}
 import org.joda.time.DateTime
 import org.jsoup.Jsoup
@@ -20,9 +22,14 @@ case class Q1_WikiDocumentsToParquetTask(bucket: String) extends Runnable {
     val toDate = DateTime.now().withYear(2017)
     val fromDate = toDate.minusYears(40)
 
-    getLeagues
-      // TODO Q1 Transformer cette seq en dataset
-      .XXXXX
+    val sSeq = getLeagues
+    println(sSeq.toString())
+
+    val ss = SparkSession.builder().appName("DataSet Test").master("local[*]").getOrCreate()
+    import ss.implicits._
+
+    val leaguesDS = getLeagues.toDS()
+
       .flatMap {
         input =>
           (fromDate.getYear until toDate.getYear).map {
@@ -52,30 +59,34 @@ case class Q1_WikiDocumentsToParquetTask(bucket: String) extends Runnable {
       .parquet(bucket)
 
     // TODO Q5 Quel est l'avantage du format parquet par rapport aux autres formats ?
+    // ==> Le format parquet est orienté colonnes. en cas d'acces d'un sous dataset, ce format est optimisé pour ce ce type d'acces.
 
     // TODO Q6 Quel est l'avantage de passer d'une séquence scala à un dataset spark ?
+    // ==> Le traitement de données au niveau du spark Dataset est plus rapide.
   }
 
-  private def getLeagues: Seq[LeagueInput] = {
+  private def getLeagues = {
+
     val mapper = new ObjectMapper(new YAMLFactory())
-    // TODO Q7 Recuperer l'input stream du fichier leagues.yaml
+    mapper.registerModule(DefaultScalaModule)
+    val yamlfile = "/leagues.yaml"
+    val inputStream = new FileInputStream(new File(yamlfile))
+
     mapper.readValue(inputStream, classOf[Array[LeagueInput]]).toSeq
+
   }
 }
+case class LeagueInput(name: String, url: String)
 
-// TODO Q8 Ajouter les annotations manquantes pour pouvoir mapper le fichier yaml à cette classe
-case class LeagueInput(name: String,
-                       url: String)
-
-case class LeagueStanding(league: String,
-                          season: Int,
-                          position: Int,
-                          team: String,
-                          points: Int,
-                          played: Int,
-                          won: Int,
-                          drawn: Int,
-                          lost: Int,
-                          goalsFor: Int,
-                          goalsAgainst: Int,
-                          goalsDifference: Int)
+case class LeagueStanding(  league: String,
+                            season: Int,
+                            position: Int,
+                            team: String,
+                            points: Int,
+                            played: Int,
+                            won: Int,
+                            drawn: Int,
+                            lost: Int,
+                            goalsFor: Int,
+                            goalsAgainst: Int,
+                            goalsDifference: Int)
